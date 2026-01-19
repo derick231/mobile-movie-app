@@ -3,19 +3,20 @@ import SearchBar from "@/Components/SearchBar";
 import { icons } from "@/constants/icons";
 import { images } from "@/constants/images";
 import { fetchMovies } from "@/Services/api";
+import { updateSearchCount } from "@/Services/appwrite";
 import useFetch from "@/Services/useFetch";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
   Image,
-  StyleSheet,
   Text,
   View,
 } from "react-native";
 
-const search = () => {
+const Search = () => {
   const [searchQuery, setSearchQuery] = useState("");
+  const lastLoggedQuery = useRef("");
 
   const {
     data: movies,
@@ -23,45 +24,68 @@ const search = () => {
     error,
     refetch: loadMovies,
     reset,
-  } = useFetch(() =>
-    fetchMovies({
-      query: searchQuery,
-    }),
+  } = useFetch(
+    () =>
+      fetchMovies({
+        query: searchQuery,
+      }),
+    false // 🔴 disable auto fetch
   );
 
+  /* ---------------------------------- */
+  /* 🔹 Debounced Search */
+  /* ---------------------------------- */
   useEffect(() => {
-    const timeOutId = setTimeout(async () => {
-      if (searchQuery.trim()) {
-        await loadMovies();
-      } else {
-        reset();
-      }
+    if (!searchQuery.trim()) {
+      reset();
+      lastLoggedQuery.current = "";
+      return;
+    }
+
+    const timeout = setTimeout(() => {
+      loadMovies();
     }, 500);
 
-    return () => clearTimeout(timeOutId);
-  }, [searchQuery]);
+    return () => clearTimeout(timeout);
+  }, [searchQuery, loadMovies, reset]);
+
+  /* ---------------------------------- */
+  /* 🔹 Log search AFTER movies load */
+  /* ---------------------------------- */
+  useEffect(() => {
+    if (!movies?.length) return;
+    if (lastLoggedQuery.current === searchQuery) return;
+
+    updateSearchCount(searchQuery, movies[0]);
+    lastLoggedQuery.current = searchQuery;
+  }, [movies, searchQuery]);
+
+  /* ---------------------------------- */
+  /* 🔹 Optimized renderItem */
+  /* ---------------------------------- */
+ 
 
   return (
     <View className="bg-primary flex-1">
       <Image
         source={images.bg}
-        className="w-full flex-1 absolute z-0 "
+        className="absolute w-full h-full z-0"
         resizeMode="cover"
       />
+
       <FlatList
-        data={movies}
-        renderItem={({ item }) => <MovieCard {...item} />}
+        data={movies ?? []}
+        renderItem={({item})=><MovieCard {...item}/>}
         keyExtractor={(item) => item.id.toString()}
-        className="px-5"
         numColumns={3}
+        showsVerticalScrollIndicator={false}
         columnWrapperStyle={{
           justifyContent: "center",
           gap: 16,
           marginVertical: 16,
         }}
-        contentContainerStyle={{
-          paddingBottom: 100,
-        }}
+        contentContainerStyle={{ paddingBottom: 100 }}
+        className="px-5"
         ListHeaderComponent={
           <>
             <View className="mt-20 w-full flex-row justify-center items-center">
@@ -72,23 +96,9 @@ const search = () => {
               <SearchBar
                 placeholder="Search movies..."
                 value={searchQuery}
-                onChangeText={(text) => setSearchQuery(text)}
+                onChangeText={setSearchQuery}
               />
             </View>
-
-            {loading && (
-              <ActivityIndicator
-                size="large"
-                color="#0000ff"
-                className="my-3"
-              />
-            )}
-
-            {error && (
-              <Text className="text-red-500 px-5 my-3">
-                Error: {error.message}
-              </Text>
-            )}
 
             {!loading && !error && searchQuery.trim() && movies?.length > 0 && (
               <Text className="text-white">
@@ -102,16 +112,29 @@ const search = () => {
           !loading && !error ? (
             <View className="mt-10 px-5">
               <Text className="text-center text-gray-500">
-                {searchQuery.trim() ? "No movies found" : "Search for a movie"}
+                {searchQuery.trim()
+                  ? "No movies found"
+                  : "Search for a movie"}
               </Text>
             </View>
           ) : null
         }
       />
+
+      {/* 🔹 Overlay loader (no flicker) */}
+      {loading && (
+        <View className="absolute inset-0 items-center justify-center bg-black/20">
+          <ActivityIndicator size="large" />
+        </View>
+      )}
+
+      {error && (
+        <Text className="absolute bottom-5 text-red-500 self-center">
+          {error.message}
+        </Text>
+      )}
     </View>
   );
 };
 
-export default search;
-
-const styles = StyleSheet.create({});
+export default Search;
