@@ -5,13 +5,13 @@ import { Image, TextInput, View } from "react-native";
 interface Props {
   onPress?: () => void;
   placeholder: string;
-  value: string
-  onChangeText: (text:string)=>void
+  value?: string
+  onChangeText?: (text:string)=>void
 }
 
 const SearchBar = ({ onPress, placeholder, onChangeText,value }: Props) => {
   return (
-    <View className="flex-row bg-dark-200 items-center gap-2 rounded-full ">
+    <View className="flex-row bg-dark-200 items-center gap-2 rounded-full ps-3">
       <Image
         source={icons.search}
         className="size-5"

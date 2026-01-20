@@ -5,18 +5,11 @@ import { images } from "@/constants/images";
 import { fetchMovies } from "@/Services/api";
 import { updateSearchCount } from "@/Services/appwrite";
 import useFetch from "@/Services/useFetch";
-import React, { useCallback, useEffect, useRef, useState } from "react";
-import {
-  ActivityIndicator,
-  FlatList,
-  Image,
-  Text,
-  View,
-} from "react-native";
+import React, { useEffect, useState } from "react";
+import { ActivityIndicator, FlatList, Image, Text, View } from "react-native";
 
 const Search = () => {
   const [searchQuery, setSearchQuery] = useState("");
-  const lastLoggedQuery = useRef("");
 
   const {
     data: movies,
@@ -29,41 +22,36 @@ const Search = () => {
       fetchMovies({
         query: searchQuery,
       }),
-    false // 🔴 disable auto fetch
+    false, // 🔴 disable auto fetch
   );
 
   /* ---------------------------------- */
   /* 🔹 Debounced Search */
   /* ---------------------------------- */
   useEffect(() => {
-    if (!searchQuery.trim()) {
-      reset();
-      lastLoggedQuery.current = "";
-      return;
-    }
-
-    const timeout = setTimeout(() => {
-      loadMovies();
+    const timeOutId = setTimeout(async () => {
+      if (searchQuery.trim()) {
+        await loadMovies();
+      } else {
+        reset();
+      }
     }, 500);
 
-    return () => clearTimeout(timeout);
-  }, [searchQuery, loadMovies, reset]);
+    return () => clearTimeout(timeOutId);
+  }, [searchQuery]);
 
   /* ---------------------------------- */
   /* 🔹 Log search AFTER movies load */
   /* ---------------------------------- */
   useEffect(() => {
-    if (!movies?.length) return;
-    if (lastLoggedQuery.current === searchQuery) return;
-
-    updateSearchCount(searchQuery, movies[0]);
-    lastLoggedQuery.current = searchQuery;
-  }, [movies, searchQuery]);
+    if (movies?.length > 0 && movies?.[0]) {
+      updateSearchCount(searchQuery, movies[0]);
+    }
+  }, [movies]);
 
   /* ---------------------------------- */
   /* 🔹 Optimized renderItem */
   /* ---------------------------------- */
- 
 
   return (
     <View className="bg-primary flex-1">
@@ -75,7 +63,7 @@ const Search = () => {
 
       <FlatList
         data={movies ?? []}
-        renderItem={({item})=><MovieCard {...item}/>}
+        renderItem={({ item }) => <MovieCard {...item} />}
         keyExtractor={(item) => item.id.toString()}
         numColumns={3}
         showsVerticalScrollIndicator={false}
@@ -112,9 +100,7 @@ const Search = () => {
           !loading && !error ? (
             <View className="mt-10 px-5">
               <Text className="text-center text-gray-500">
-                {searchQuery.trim()
-                  ? "No movies found"
-                  : "Search for a movie"}
+                {searchQuery.trim() ? "No movies found" : "Search for a movie"}
               </Text>
             </View>
           ) : null
